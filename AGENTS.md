@@ -17,8 +17,6 @@ uv add <package> --dev
 
 ## Linting and Formatting
 
-We usually provide a Makefile with common commands for linting, formatting, and testing. Check the Makefile for available targets. For example `make lint` or `make format`.
-
 Run linting and formatting via `uvx`:
 
 ```bash
@@ -53,7 +51,7 @@ Catches common logic bugs and opinionated style problems. Key rules in effect:
 
 ### UP - pyupgrade
 
-Enforces modern Python 3.12 syntax. Examples: use `X | Y` union syntax over `Union[X, Y]`, use `list[str]` over `List[str]`, use f-strings over `.format()` where possible.
+Enforces modern Python 3.13 syntax. Examples: use `X | Y` union syntax over `Union[X, Y]`, use `list[str]` over `List[str]`, use f-strings over `.format()` where possible.
 
 ### N - pep8-naming
 
@@ -101,11 +99,7 @@ The `D417` rule (missing argument descriptions) is ignored - describe arguments 
 
 Private functions (prefixed with `_`) do not require docstrings but benefit from them when the logic is non-obvious.
 
-### FAST - FastAPI
-
-- Do not use `response_model=` when the return type annotation already conveys the same information (FAST001).
-- FastAPI dependencies must use `Annotated` (FAST002): `param: Annotated[str, Depends(get_value)]`.
-- Every path parameter in the route string must appear in the function signature (FAST003).
+Docs string content should always be very brief and only contain necessary information.
 
 ### TID - flake8-tidy-imports
 
@@ -141,6 +135,11 @@ import os
 os.path.join("data", "input.csv")
 os.makedirs("data", exist_ok=True)
 ```
+
+---
+## Comments
+
+In-line comments should only appear in functions and should be very brief. Design decitions and background informations will never be part of this comment.
 
 ---
 
@@ -182,8 +181,6 @@ app/demo_service/service_test.py
 ```
 
 Run tests:
-
-make test # if a Makefile target is provided
 
 ```bash
 uv run pytest *_test.py **/*_test.py

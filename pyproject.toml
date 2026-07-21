@@ -1,0 +1,140 @@
+[project]
+name = "mcrtx"
+version = "0.1.0.dev0"
+description = "GPU-native, differentiable radiative transfer building blocks in JAX"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Dennis Frei", email = "dennisfrei@gmx.net" }]
+requires-python = ">=3.13"
+keywords = [
+  "radiative-transfer",
+  "monte-carlo",
+  "jax",
+  "astrophysics",
+  "stellar-winds",
+  "sobolev",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+  "jax>=0.4.35",
+  "unxt>=1.0",
+  "equinox>=0.11",
+]
+
+[project.optional-dependencies]
+cuda = ["jax[cuda12]>=0.4.35"]
+
+[project.urls]
+Homepage = "https://github.com/dennisfrei/MCRTX"
+Issues = "https://github.com/dennisfrei/MCRTX/issues"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "chex>=0.1.87",
+  "ruff>=0.9",
+  "ty",
+  "pre-commit>=4.0",
+]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.27",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcrtx"]
+exclude = ["**/*_test.py"]
+
+# ------------------------------------------------------------------ ruff ----
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["src"]
+fix = true
+unsafe-fixes = false
+
+[tool.ruff.lint]
+select = [
+  "E", "W",    # pycodestyle
+  "F",         # pyflakes
+  "I",         # isort
+  "UP",        # pyupgrade
+  "B",         # bugbear
+  "N",         # pep8-naming
+  "C4",        # flake8-comprehensions
+  "C90",       # mccabe complexity
+  "SIM",       # simplify
+  "TID",       # flake8-tidy-imports (absolute imports)
+  "PTH",       # flake8-use-pathlib
+  "ASYNC",     # flake8-async (dormant until async code exists)
+  "NPY",       # numpy rules (largely apply to jax.numpy too)
+  "RUF",       # ruff-specific
+  "D",         # pydocstyle (public package -> enforce docstrings early)
+  "ANN",       # type annotations
+]
+ignore = [
+  "ANN401",    # Any in **kwargs is fine
+  "D105",      # magic-method docstrings
+  "D107",      # __init__ docstrings (documented at class level)
+  "D417",      # describe args as a group, not one-by-one
+  "E501",      # line length handled by the formatter
+  "E203",      # slice whitespace handled by the formatter
+]
+pydocstyle.convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 40
+
+[tool.ruff.lint.per-file-ignores]
+"**/*_test.py" = ["D", "ANN", "S101"]
+"conftest.py" = ["D", "ANN"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+# -------------------------------------------------------------------- ty ----
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["src"]
+
+# ---------------------------------------------------------------- pytest ----
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["*_test.py"]
+addopts = [
+  "--import-mode=importlib",
+  "--strict-markers",
+  "-ra",
+]
+markers = [
+  "slow: long-running statistical MC tests (deselect with '-m \"not slow\"')",
+  "gpu: requires a GPU backend",
+]
+filterwarnings = ["error"]
+
+# -------------------------------------------------------------- coverage ----
+[tool.coverage.run]
+source = ["mcrtx"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
