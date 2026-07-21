@@ -1,0 +1,32 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["app"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+fix = true
+unsafe-fixes = false
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle - basic PEP8 style checks: formatting / style
+    "F",   # pyflakes - errors, unused vars/imports
+    "I",   # isort - Order of imports: standard -> third party -> local
+    "B",   # bugbear - common logic bugs
+    "UP",  # pyupgrade for modern syntax
+    "N",   # PEP8 naming conventions
+    "C4",  # flake8 comprehensions
+    "C90", # complexity check
+]
+ignore = ["E501", "E203", "B008"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 40
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
