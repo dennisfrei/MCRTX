@@ -6,4 +6,7 @@ Both MVP solvers consume the same L2/L3 interfaces (D2, D6):
 - ``mcrtx.solvers.reference`` deterministic SEI-style baseline
 """
 
-__all__: list[str] = []
+from mcrtx.solvers.mc import run_profile
+from mcrtx.solvers.reference import solve_profile
+
+__all__ = ["run_profile", "solve_profile"]

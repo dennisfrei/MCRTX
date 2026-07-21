@@ -115,6 +115,7 @@ python-version = "3.13"
 
 [tool.ty.src]
 include = ["src"]
+exclude = ["**/*_test.py", "conftest.py"]
 
 # ---------------------------------------------------------------- pytest ----
 [tool.pytest.ini_options]
