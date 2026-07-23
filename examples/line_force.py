@@ -16,7 +16,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from _plot import save_png, show_series
+from _plot import console, save_png, show_series
 
 from mcrtx.dynamics import sobolev_line_force
 from mcrtx.media import BetaLawWind
@@ -39,7 +39,7 @@ def main():
         lines = [LineData(tau_scale=jnp.asarray(tau_scale), n_l_exponent=jnp.asarray(0.0))] * N_LINES
         g = sobolev_line_force(wind, lines, r)
         series[label] = [float(v) for v in g / jnp.max(g)]  # normalised shape
-        print(f"  {label:>20}: g_rad peaks at r = {float(r[int(jnp.argmax(g))]):.2f}")
+        console.print(f"  {label:>20}: g_rad peaks at r = {float(r[int(jnp.argmax(g))]):.2f}", markup=False)
 
     rs = [float(v) for v in r]
     show_series(rs, series, lo=0.0, hi=1.0)
@@ -48,11 +48,11 @@ def main():
         "examples/output/line_force.png",
         rs,
         series,
-        xlabel="radius r  (R_star)",
-        ylabel="g_rad(r) / peak",
-        title=f"Radiative line force ({N_LINES} lines)",
+        xlabel=r"Radius $r / R_\star$",
+        ylabel=r"$g_\mathrm{rad}(r) / g_{\mathrm{rad,max}}$",
+        title=rf"Radiative line force ($N_\mathrm{{lines}} = {N_LINES}$)",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":

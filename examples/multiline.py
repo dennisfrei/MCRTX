@@ -15,7 +15,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from _plot import save_png, show_series
+from _plot import console, save_png, show_series
 
 from mcrtx.media import BetaLawWind
 from mcrtx.physics.source import LineData
@@ -41,9 +41,12 @@ def main():
     x = jnp.linspace(min(centers) - 2.0, max(centers) + 2.0, 241)
     additive = multiline_profile(wind, centers, lines, x, source=SOURCE, n_p=400)
     coupled = multiline_profile_coupled(wind, centers, lines, x, source=SOURCE, n_p=400)
-    print(f"{len(LINES)} lines at v/v_inf = {centers}")
-    print(f"  additive: flux in [{float(additive.min()):.2f}, {float(additive.max()):.2f}]  (unphysical if < 0)")
-    print(f"  coupled : flux in [{float(coupled.min()):.2f}, {float(coupled.max()):.2f}]")
+    console.print(f"{len(LINES)} lines at v/v_inf = {centers}", markup=False)
+    console.print(
+        f"  additive: flux in [{float(additive.min()):.2f}, {float(additive.max()):.2f}]  (unphysical if < 0)",
+        markup=False,
+    )
+    console.print(f"  coupled : flux in [{float(coupled.min()):.2f}, {float(coupled.max()):.2f}]", markup=False)
 
     xs = [float(v) for v in x]
     series = {"additive": [float(v) for v in additive], "coupled (exact)": [float(v) for v in coupled]}
@@ -55,11 +58,11 @@ def main():
         "examples/output/multiline.png",
         xs,
         series,
-        xlabel="velocity  (v_inf units)",
-        ylabel="F / F_continuum",
+        xlabel=r"Velocity $v / v_\infty$",
+        ylabel=r"$F / F_\mathrm{continuum}$",
         title=f"{len(LINES)}-line doublet: additive vs coupled",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":

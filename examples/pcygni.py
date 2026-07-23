@@ -15,7 +15,7 @@ jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 import unxt as u
-from _plot import save_png, show_series
+from _plot import console, save_png, show_series
 from unxt import Quantity
 
 from mcrtx.scenarios import Method, RunConfig, SourceModel, WindLineScenario, solve
@@ -51,7 +51,7 @@ def main():
         beta=BETA,
     )
     n_ref = float(scenario.density_ref.ustrip(u.unit("cm**-3")))
-    print(f"scenario: tau_scale={scenario.tau_scale:.1f}  n_ref={n_ref:.2e} cm^-3")
+    console.print(f"scenario: tau_scale={scenario.tau_scale:.1f}  n_ref={n_ref:.2e} cm^-3", markup=False)
 
     runs = {
         "reference thin": (Method.REFERENCE, SourceModel.THIN),
@@ -68,22 +68,25 @@ def main():
         dx = float(velocity[1] - velocity[0]) / V_INF_KMS  # in v_inf units
         ew = float(jnp.sum(1.0 - flux) * dx)
         series[name] = [float(v) for v in flux]
-        print(f"  {name:>22}: R in [{float(flux.min()):.2f}, {float(flux.max()):.2f}]  equiv.width={ew:+.3f}")
+        console.print(
+            f"  {name:>22}: R in [{float(flux.min()):.2f}, {float(flux.max()):.2f}]  equiv.width={ew:+.3f}",
+            markup=False,
+        )
 
     velocities = [float(v) for v in velocity]
     hi = max(max(s) for s in series.values())
-    print()
+    console.print()
     show_series(velocities, series, lo=0.0, hi=hi)
 
     png = save_png(
         "examples/output/pcygni.png",
         velocities,
         series,
-        xlabel="Doppler velocity [km/s]",
-        ylabel="F / F_continuum",
-        title=f"P-Cygni profile  (tau_scale={scenario.tau_scale:.0f})",
+        xlabel=r"Doppler velocity $v$ [km s$^{-1}$]",
+        ylabel=r"$F / F_\mathrm{continuum}$",
+        title=rf"P-Cygni profile ($\tau_\mathrm{{scale}} = {scenario.tau_scale:.0f}$)",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":

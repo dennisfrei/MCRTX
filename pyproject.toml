@@ -51,6 +51,7 @@ docs = [
 ]
 examples = [
   "matplotlib>=3.9",
+  "rich>=15.0.0",
 ]
 
 [build-system]

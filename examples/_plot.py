@@ -1,4 +1,4 @@
-"""Tiny plotting helpers for the examples — ASCII always, PNG if matplotlib is present.
+"""Tiny plotting helpers for the examples: Rich terminal output and optional PNGs.
 
 Run the scripts with ``uv run --group examples python examples/<name>.py`` to get
 PNGs; without the group they still print sparklines to the terminal.
@@ -9,7 +9,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+from rich.console import Console
+from rich.table import Table
+
 _BLOCKS = "▁▂▃▄▅▆▇█"
+console = Console(highlight=True, color_system="truecolor")
 
 
 def sparkline(values: Sequence[float], lo: float | None = None, hi: float | None = None) -> str:
@@ -22,9 +26,13 @@ def sparkline(values: Sequence[float], lo: float | None = None, hi: float | None
 
 def show_series(x: Sequence[float], series: dict[str, Sequence[float]], *, lo: float, hi: float) -> None:
     """Print each named series as a sparkline sharing one vertical scale."""
-    print(f"    x: {float(x[0]):+.2f} {'.' * 20} {float(x[-1]):+.2f}   (scale {lo:.2f}..{hi:.2f})")
+    table = Table(show_header=False, box=None, pad_edge=False)
+    table.add_column(style="bold cyan", no_wrap=True)
+    table.add_column()
+    table.add_row("x", f"{float(x[0]):+.2f} {'.' * 20} {float(x[-1]):+.2f}  [dim](scale {lo:.2f}..{hi:.2f})[/]")
     for name, values in series.items():
-        print(f"  {name:>18}: {sparkline(values, lo, hi)}")
+        table.add_row(name, sparkline(values, lo, hi))
+    console.print(table)
 
 
 def save_png(

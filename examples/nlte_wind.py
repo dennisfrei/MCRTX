@@ -16,7 +16,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from _plot import save_png, show_series
+from _plot import console, save_png, show_series
 
 from mcrtx.media import BetaLawWind
 from mcrtx.physics.source import LineData
@@ -50,22 +50,25 @@ def main():
         ew = float(jnp.sum(1.0 - flux) * dx)
         label = "scattering" if collision == 0.0 else f"collision={collision:g}"
         series[label] = [float(v) for v in flux]
-        print(f"  {label:>16}: R in [{float(flux.min()):.2f}, {float(flux.max()):.2f}]  equiv.width={ew:+.3f}")
+        console.print(
+            f"  {label:>16}: R in [{float(flux.min()):.2f}, {float(flux.max()):.2f}]  equiv.width={ew:+.3f}",
+            markup=False,
+        )
 
     xs = [float(v) for v in x]
     hi = max(max(s) for s in series.values())
-    print()
+    console.print()
     show_series(xs, series, lo=0.0, hi=hi)
 
     png = save_png(
         "examples/output/nlte_wind.png",
         xs,
         series,
-        xlabel="normalised frequency x  (v_inf units)",
-        ylabel="F / F_continuum",
-        title=f"Line thermalising with collisions  (tau_scale={TAU_SCALE:g})",
+        xlabel=r"Normalised velocity $x = v / v_\infty$",
+        ylabel=r"$F / F_\mathrm{continuum}$",
+        title=rf"Line thermalising with collisions ($\tau_\mathrm{{scale}} = {TAU_SCALE:g}$)",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":

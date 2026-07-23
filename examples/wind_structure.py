@@ -15,7 +15,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from _plot import save_png, show_series
+from _plot import console, save_png, show_series
 
 from mcrtx.media import BetaLawWind
 
@@ -33,31 +33,32 @@ def main():
         wind = BetaLawWind(beta=jnp.asarray(beta), v_phot=jnp.asarray(V_PHOT), mdot_scale=jnp.asarray(1.0))
         velocities[f"beta={beta:g}"] = [float(v) for v in wind.v(r)]
 
-    print("velocity field v(r) / v_inf  (lower beta accelerates faster):")
+    console.print("velocity field v(r) / v_inf  (lower beta accelerates faster):", markup=False)
     show_series([float(v) for v in r], velocities, lo=0.0, hi=1.0)
 
     # Structure table for the middle beta.
     wind = BetaLawWind(
         beta=jnp.asarray(BETAS[len(BETAS) // 2]), v_phot=jnp.asarray(V_PHOT), mdot_scale=jnp.asarray(1.0)
     )
-    print(f"\nstructure for beta={BETAS[len(BETAS) // 2]:g}:")
-    print(f"  {'r':>5} {'v/v_inf':>9} {'dv/dr':>9} {'rho':>11} {'W(r)':>7}")
+    console.print(f"\nstructure for beta={BETAS[len(BETAS) // 2]:g}:", markup=False)
+    console.print(f"  {'r':>5} {'v/v_inf':>9} {'dv/dr':>9} {'rho':>11} {'W(r)':>7}", markup=False)
     for ri in (1.0, 1.5, 2.0, 5.0, 10.0, 20.0):
         rj = jnp.asarray(ri)
-        print(
+        console.print(
             f"  {ri:5.1f} {float(wind.v(rj)):9.4f} {float(wind.dv_dr(rj)):9.4f} "
-            f"{float(wind.rho(rj)):11.4e} {float(wind.dilution(rj)):7.4f}"
+            f"{float(wind.rho(rj)):11.4e} {float(wind.dilution(rj)):7.4f}",
+            markup=False,
         )
 
     png = save_png(
         "examples/output/wind_structure.png",
         [float(v) for v in r],
         velocities,
-        xlabel="radius r  (R_star)",
-        ylabel="v(r) / v_inf",
-        title="Beta-law velocity field",
+        xlabel=r"Radius $r / R_\star$",
+        ylabel=r"$v(r) / v_\infty$",
+        title=r"$\beta$-law velocity field",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":

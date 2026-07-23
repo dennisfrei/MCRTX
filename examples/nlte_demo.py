@@ -15,7 +15,7 @@ import jax
 jax.config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
-from _plot import save_png, sparkline
+from _plot import console, save_png, sparkline
 
 from mcrtx.physics.nlte import AtomicModel, assemble_rate_matrix, statistical_equilibrium
 
@@ -46,8 +46,8 @@ def main() -> None:
 
     boltzmann = g * jnp.exp(-energy / KT)
     boltzmann = boltzmann / jnp.sum(boltzmann)
-    print(f"LTE (Boltzmann) populations: {[round(float(v), 3) for v in boltzmann]}")
-    print("radiation pumps the 0->1 line; populations leave LTE as J grows:\n")
+    console.print(f"LTE (Boltzmann) populations: {[round(float(v), 3) for v in boltzmann]}", markup=False)
+    console.print("radiation pumps the 0->1 line; populations leave LTE as J grows:\n", markup=False)
 
     def solve(pump: float) -> jax.Array:
         # Radiative rates on transition 0 (0->1): r_up = (g_u/g_l) J, r_down = A + J.
@@ -57,20 +57,20 @@ def main() -> None:
 
     populations = [solve(p) for p in PUMP]
     for pump, n in zip(PUMP, populations, strict=True):
-        print(f"  J={pump:5.1f}: n = [{', '.join(f'{float(v):.3f}' for v in n)}]")
+        console.print(f"  J={pump:5.1f}: n = [{', '.join(f'{float(v):.3f}' for v in n)}]", markup=False)
 
     n_upper = [float(n[1]) for n in populations]
-    print(f"\n  n(level 1) vs J: {sparkline(n_upper)}")
+    console.print(f"\n  n(level 1) vs J: {sparkline(n_upper)}", markup=False)
 
     png = save_png(
         "examples/output/nlte.png",
         PUMP,
         {f"n(level {i})": [float(n[i]) for n in populations] for i in range(len(G))},
-        xlabel="radiation field J (scaled)",
-        ylabel="level population",
-        title="3-level atom: LTE -> radiation-pumped",
+        xlabel=r"Radiation field $J$ (scaled)",
+        ylabel=r"Level population $n_i$",
+        title=r"3-level atom: LTE $\to$ radiation-pumped",
     )
-    print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)")
+    console.print(f"\nPNG: {png}" if png else "\n(install the 'examples' group for a PNG)", markup=False)
 
 
 if __name__ == "__main__":
