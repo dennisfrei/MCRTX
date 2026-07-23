@@ -742,6 +742,7 @@ name = "mcrtx"
 version = "0.1.0.dev0"
 source = { editable = "." }
 dependencies = [
+    { name = "astropy" },
     { name = "equinox" },
     { name = "jax" },
     { name = "unxt" },
@@ -772,6 +773,7 @@ examples = [
 
 [package.metadata]
 requires-dist = [
+    { name = "astropy", specifier = ">=8.0.1" },
     { name = "equinox", specifier = ">=0.11" },
     { name = "jax", specifier = ">=0.4.35" },
     { name = "jax", extras = ["cuda12"], marker = "extra == 'cuda'", specifier = ">=0.4.35" },

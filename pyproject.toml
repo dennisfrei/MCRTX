@@ -27,6 +27,7 @@ dependencies = [
   "jax>=0.4.35",
   "unxt>=1.0",
   "equinox>=0.11",
+  "astropy>=8.0.1",
 ]
 
 [project.optional-dependencies]
