@@ -51,6 +51,7 @@ jax.grad(lambda b: BetaLawWind(b, jnp.asarray(0.01), jnp.asarray(1.0)).v(jnp.asa
 
 ## Documentation
 
+- [`docs/physics.md`](docs/physics.md) — the physical concepts behind the simulations
 - [`docs/architecture.md`](docs/architecture.md) — layer model, project status, MVP scope
 - [`docs/concept.md`](docs/concept.md) — full design document (German)
 - [`docs/development.md`](docs/development.md) — running tests, linting, type checks

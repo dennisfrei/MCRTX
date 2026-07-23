@@ -49,6 +49,9 @@ docs = [
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
 ]
+examples = [
+  "matplotlib>=3.9",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -101,6 +104,7 @@ max-complexity = 40
 [tool.ruff.lint.per-file-ignores]
 "**/*_test.py" = ["D", "ANN", "S101"]
 "conftest.py" = ["D", "ANN"]
+"examples/**" = ["D", "ANN", "E402", "T201"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -125,6 +129,8 @@ addopts = [
   "--import-mode=importlib",
   "--strict-markers",
   "-ra",
+  "-m",
+  "not slow",  # plain `pytest` is fast; override with `-m ...` (CI runs `not gpu`)
 ]
 markers = [
   "slow: long-running statistical MC tests (deselect with '-m \"not slow\"')",

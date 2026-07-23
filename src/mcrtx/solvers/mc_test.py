@@ -12,7 +12,11 @@ import pytest
 from mcrtx.media import BetaLawWind
 from mcrtx.physics.source import LineData
 from mcrtx.solvers.mc import run_profile
-from mcrtx.solvers.reference import solve_profile
+from mcrtx.solvers.reference import SourceModel, solve_profile
+
+# The Monte Carlo solver tests are statistical and XLA-compilation-heavy; the
+# whole module is 'slow' so a plain `pytest` skips it (CI runs `-m "not gpu"`).
+pytestmark = pytest.mark.slow
 
 XC = jnp.linspace(-1.15, 1.15, 24)
 _DX = XC[1] - XC[0]
@@ -53,6 +57,20 @@ def test_matches_reference_within_mc_noise(wind):
     assert jnp.max(mc[XC > 0.2]) > 1.1  # redshifted emission
 
 
+def test_self_consistent_source_matches_reference(wind):
+    # M1: swapping the emission source (W -> two_level_source) still matches the
+    # reference by construction, since each photon scatters at most once.
+    line = _line(5.0)
+    ref = solve_profile(wind, line, XC, n_p=800, source=SourceModel.SELF_CONSISTENT)
+    mc = run_profile(
+        wind, line, EDGES, jax.random.key(0), n_packets=N_PK, band=BAND, source=SourceModel.SELF_CONSISTENT
+    )
+    rms = jnp.sqrt(jnp.mean((mc - ref) ** 2))
+    assert float(rms) < 0.05
+    # Photon-conserving (bounded equivalent width), unlike the thin source.
+    assert float(jnp.abs(jnp.sum(1.0 - mc) * _DX)) < 0.3
+
+
 def test_differentiable_in_optical_depth(wind):
     # Gradients flow through the smooth weights (D3), not the random draws.
     def trough(tau_scale):
@@ -64,7 +82,6 @@ def test_differentiable_in_optical_depth(wind):
     assert g < 0.0  # deeper absorption trough as opacity grows
 
 
-@pytest.mark.slow
 def test_gradient_matches_finite_difference(wind):
     # D3 acceptance (concept sec. 5.3): the AD gradient at a fixed seed is an
     # unbiased estimator of d E[R] / d(tau_scale). With common random numbers it

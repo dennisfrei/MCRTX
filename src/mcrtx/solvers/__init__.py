@@ -7,6 +7,14 @@ Both MVP solvers consume the same L2/L3 interfaces (D2, D6):
 """
 
 from mcrtx.solvers.mc import run_profile
-from mcrtx.solvers.reference import solve_profile
+from mcrtx.solvers.multiline import multiline_profile, multiline_profile_coupled
+from mcrtx.solvers.reference import SourceModel, solve_profile, source_at
 
-__all__ = ["run_profile", "solve_profile"]
+__all__ = [
+    "SourceModel",
+    "multiline_profile",
+    "multiline_profile_coupled",
+    "run_profile",
+    "solve_profile",
+    "source_at",
+]

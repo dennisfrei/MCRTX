@@ -5,6 +5,8 @@ wind MVP: ``v(r)``, ``dv_dr(r)``, ``rho(r)``, ``dilution(r)``. Solvers and
 physics modules consume only this interface, never model internals.
 """
 
+from mcrtx.media.base import Medium
+from mcrtx.media.tabulated import TabulatedWind
 from mcrtx.media.wind import BetaLawWind
 
-__all__ = ["BetaLawWind"]
+__all__ = ["BetaLawWind", "Medium", "TabulatedWind"]

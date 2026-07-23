@@ -28,14 +28,15 @@ import jax.numpy as jnp
 from jax import Array
 
 from mcrtx.core import Estimators, PacketState, deposit_escape
-from mcrtx.media import BetaLawWind
+from mcrtx.media import Medium
 from mcrtx.physics import sobolev_tau
 from mcrtx.physics.source import LineData
+from mcrtx.solvers.reference import SourceModel, source_at
 
 __all__ = ["run_profile"]
 
 
-def _resonance_z(wind: BetaLawWind, p: Array, target: Array, z_lo: Array, z_far: float, n_bisect: int) -> Array:
+def _resonance_z(wind: Medium, p: Array, target: Array, z_lo: Array, z_far: float, n_bisect: int) -> Array:
     """Bisection for ``w(z) = target`` on ``[z_lo, z_far]`` (target >= 0).
 
     ``w(z) = v(r) z / r`` with ``r = sqrt(p^2 + z^2)`` is monotonic in ``z``.
@@ -55,7 +56,7 @@ def _resonance_z(wind: BetaLawWind, p: Array, target: Array, z_lo: Array, z_far:
     return 0.5 * (lo + hi)
 
 
-def _sobolev_tau_at(wind: BetaLawWind, line: LineData, p: Array, z: Array) -> tuple[Array, Array]:
+def _sobolev_tau_at(wind: Medium, line: LineData, p: Array, z: Array) -> tuple[Array, Array]:
     """Sobolev optical depth at the resonance ``(p, z)`` and its radius (clamped >= 1)."""
     r = jnp.maximum(jnp.sqrt(p**2 + z**2), 1.0)
     mu = z / r
@@ -65,7 +66,7 @@ def _sobolev_tau_at(wind: BetaLawWind, line: LineData, p: Array, z: Array) -> tu
 
 
 def run_profile(
-    wind: BetaLawWind,
+    wind: Medium,
     line: LineData,
     x_edges: Array,
     key: Array,
@@ -75,11 +76,18 @@ def run_profile(
     p_max: float = 20.0,
     z_far: float = 1.0e3,
     n_bisect: int = 50,
+    source: SourceModel = SourceModel.THIN,
+    n_r: int = 256,
+    n_mu: int = 64,
 ) -> Array:
     """Monte Carlo P-Cygni profile, normalised to the continuum.
 
+    In a monotonic wind each photon Sobolev-scatters at most once, so the
+    self-consistent M1 result differs from M0 only in the emission source
+    function (``source``); the transmitted/absorption beam is unchanged.
+
     Args:
-        wind: The beta-law wind medium (dimensionless).
+        wind: The medium (dimensionless); any `Medium` (analytic or tabulated).
         line: Resonance-line data (``tau_scale``, ``n_l_exponent``).
         x_edges: Monotonic frequency-bin edges in units of ``v_inf``, shape ``(Nx + 1,)``.
         key: Root PRNG key for the run.
@@ -88,6 +96,9 @@ def run_profile(
         p_max: Outer impact parameter for the emission integral.
         z_far: Line-of-sight half-extent bracketing the resonance search.
         n_bisect: Bisection iterations for the resonance location.
+        source: Emission source closure (``THIN`` for M0, ``SELF_CONSISTENT`` for M1).
+        n_r: Radius-grid points for the self-consistent source table.
+        n_mu: Angular quadrature points for the self-consistent source.
 
     Returns:
         Normalised flux ``F(x) / F_continuum`` per bin, shape ``(Nx,)``.
@@ -133,7 +144,8 @@ def run_profile(
     visible = has_e & ~((pe < 1.0) & (xe > 0.0))
     ze = _resonance_z(wind, pe, abs_xe, z_entry, z_far, n_bisect)
     tau_e, r_e = _sobolev_tau_at(wind, line, pe, ze)
-    emissivity = wind.dilution(r_e) * (1.0 - jnp.exp(jnp.where(has_e, -tau_e, 0.0)))
+    s_e = source_at(wind, line, r_e, source, p_max, n_r, n_mu)
+    emissivity = s_e * (1.0 - jnp.exp(jnp.where(has_e, -tau_e, 0.0)))
     weight_emit = 0.5 * p_max**2 * emissivity * visible
     flux_emission = deposit(xe, weight_emit)
 

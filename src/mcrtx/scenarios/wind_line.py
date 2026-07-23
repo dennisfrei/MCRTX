@@ -26,14 +26,16 @@ from unxt import AbstractQuantity, Quantity
 
 from mcrtx.media import BetaLawWind
 from mcrtx.physics.source import LineData
-from mcrtx.solvers import run_profile, solve_profile
+from mcrtx.solvers import SourceModel, run_profile, solve_profile
 from mcrtx.units import ReferenceScales, Scale
 
 __all__ = [
     "Method",
     "RunConfig",
+    "SourceModel",
     "WindLineResult",
     "WindLineScenario",
+    "collisional_parameters",
     "continuity_number_density",
     "sobolev_tau_scale",
     "solve",
@@ -106,6 +108,54 @@ def sobolev_tau_scale(
     return float(np.asarray(tau.ustrip(u.unit(""))).item())
 
 
+# h / k_B in K s (so h nu / k T = _H_OVER_K nu / T), and the Maxwellian
+# collisional de-excitation rate coefficient constant in cm^3 s^-1 K^1/2.
+_H_OVER_K = 4.799243e-11
+_COLLISION_COEFF = 8.629e-6
+
+
+def collisional_parameters(
+    n_e: float,
+    t_gas: float,
+    t_rad: float,
+    nu_0: float,
+    collision_strength: float,
+    a_ul: float,
+    g_upper: float = 3.0,
+) -> tuple[float, float, float]:
+    """Dimensionless NLTE knobs ``(collision, w_core, boltzmann)`` from plasma + atomic data.
+
+    Feeds :class:`WindLineScenario` / :func:`~mcrtx.physics.sobolev_nlte_source`.
+    For hot-star resonance lines (large ``a_ul``, modest ``n_e``) this returns a
+    tiny ``collision`` — i.e. those lines are scattering-dominated, which is why
+    the M0/M1 scattering source is the right default; collisions bite only at high
+    density or for weak transitions.
+
+    All inputs are cgs numbers: ``n_e`` [cm^-3], ``t_gas``/``t_rad`` [K],
+    ``nu_0`` [Hz], ``a_ul`` [s^-1]; ``collision_strength`` is the dimensionless
+    effective collision strength.
+
+    Args:
+        n_e: Electron number density.
+        t_gas: Gas (kinetic) temperature setting the collisions.
+        t_rad: Radiation temperature of the illuminating core.
+        nu_0: Line rest frequency.
+        collision_strength: Effective collision strength ``Omega_ul``.
+        a_ul: Spontaneous emission rate.
+        g_upper: Upper-level statistical weight.
+
+    Returns:
+        ``(collision, w_core, boltzmann)`` for the NLTE source.
+    """
+    x_gas = _H_OVER_K * nu_0 / t_gas
+    x_rad = _H_OVER_K * nu_0 / t_rad
+    boltzmann = float(np.exp(-x_gas))
+    w_core = float(1.0 / np.expm1(x_rad))  # Planck occupation number 1 / (e^x - 1)
+    q_ul = _COLLISION_COEFF * collision_strength / (g_upper * np.sqrt(t_gas))
+    collision = float(n_e * q_ul / a_ul)
+    return collision, w_core, boltzmann
+
+
 class Method(StrEnum):
     """Transfer solver to run a scenario with."""
 
@@ -138,6 +188,12 @@ class WindLineScenario:
     mdot_scale: float
     tau_scale: float
     n_l_exponent: float = 0.0
+    # Two-level NLTE knobs (see collisional_parameters); defaults give pure scattering.
+    collision: float = 0.0
+    w_core: float = 1.0
+    boltzmann: float = 1.0
+    g_lower: float = 1.0
+    g_upper: float = 3.0
 
     @classmethod
     def from_physical(
@@ -153,12 +209,19 @@ class WindLineScenario:
         beta: float,
         stimulated: float = 1.0,
         n_l_exponent: float = 0.0,
+        collision: float = 0.0,
+        w_core: float = 1.0,
+        boltzmann: float = 1.0,
+        g_lower: float = 1.0,
+        g_upper: float = 3.0,
     ) -> Self:
         """Build a scenario from physical wind and atomic-data quantities.
 
         The reference density follows from mass continuity (``mdot_scale = 1``) and
         the line strength from the Sobolev constant; see
-        :func:`continuity_number_density` and :func:`sobolev_tau_scale`.
+        :func:`continuity_number_density` and :func:`sobolev_tau_scale`. The
+        ``collision``/``w_core``/``boltzmann`` NLTE knobs default to pure
+        scattering — obtain physical values from :func:`collisional_parameters`.
 
         Args:
             r_star: Stellar radius.
@@ -171,6 +234,11 @@ class WindLineScenario:
             beta: Velocity-law exponent.
             stimulated: Stimulated-emission correction (default 1).
             n_l_exponent: Radial power-law tweak of the lower-level population.
+            collision: Collisional de-excitation rate ``C_ul / A_ul`` (0 = scattering).
+            w_core: Core radiation occupation number.
+            boltzmann: Detailed-balance factor ``exp(-h nu / k T_gas)``.
+            g_lower: Lower-level statistical weight.
+            g_upper: Upper-level statistical weight.
 
         Returns:
             The corresponding scenario.
@@ -187,6 +255,11 @@ class WindLineScenario:
             mdot_scale=1.0,
             tau_scale=tau_scale,
             n_l_exponent=n_l_exponent,
+            collision=collision,
+            w_core=w_core,
+            boltzmann=boltzmann,
+            g_lower=g_lower,
+            g_upper=g_upper,
         )
 
 
@@ -200,6 +273,7 @@ class RunConfig:
         n_bins: Number of frequency samples (bin centres).
         n_packets: Monte Carlo sample count per estimator (``method="mc"`` only).
         seed: PRNG seed (``method="mc"`` only).
+        source: Source-function closure (``THIN`` for M0, ``SELF_CONSISTENT`` for M1).
     """
 
     x_min: float = -1.3
@@ -207,6 +281,7 @@ class RunConfig:
     n_bins: int = 101
     n_packets: int = 500_000
     seed: int = 0
+    source: SourceModel = SourceModel.THIN
 
 
 class WindLineResult(NamedTuple):
@@ -248,16 +323,25 @@ def solve(
         v_phot=scales.nondimensionalize(scenario.v_phot, Scale.VELOCITY),
         mdot_scale=jnp.asarray(scenario.mdot_scale),
     )
-    line = LineData(tau_scale=jnp.asarray(scenario.tau_scale), n_l_exponent=jnp.asarray(scenario.n_l_exponent))
+    line = LineData(
+        tau_scale=jnp.asarray(scenario.tau_scale),
+        n_l_exponent=jnp.asarray(scenario.n_l_exponent),
+        collision=jnp.asarray(scenario.collision),
+        w_core=jnp.asarray(scenario.w_core),
+        boltzmann=jnp.asarray(scenario.boltzmann),
+        g_lower=scenario.g_lower,
+        g_upper=scenario.g_upper,
+    )
 
     centers = jnp.linspace(config.x_min, config.x_max, config.n_bins)
     if method is Method.REFERENCE:
-        flux = solve_profile(wind, line, centers)
+        flux = solve_profile(wind, line, centers, source=config.source)
     elif method is Method.MC:
         half = 0.5 * (config.x_max - config.x_min) / (config.n_bins - 1)
         edges = jnp.concatenate([centers - half, centers[-1:] + half])
         band = (config.x_min - half, config.x_max + half)
-        flux = run_profile(wind, line, edges, jax.random.key(config.seed), n_packets=config.n_packets, band=band)
+        key = jax.random.key(config.seed)
+        flux = run_profile(wind, line, edges, key, n_packets=config.n_packets, band=band, source=config.source)
     else:  # pragma: no cover - StrEnum guards the input
         raise ValueError(f"unknown method: {method}")
 

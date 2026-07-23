@@ -1,5 +1,7 @@
 """Scenario layer: unit boundary, cgs/SI roundtrip, solver dispatch."""
 
+from dataclasses import replace
+
 import jax.numpy as jnp
 import pytest
 import unxt as u
@@ -8,8 +10,10 @@ from unxt import Quantity
 from mcrtx.scenarios import (
     Method,
     RunConfig,
+    SourceModel,
     WindLineResult,
     WindLineScenario,
+    collisional_parameters,
     continuity_number_density,
     sobolev_tau_scale,
     solve,
@@ -36,6 +40,7 @@ def scenario():
     )
 
 
+@pytest.mark.slow
 def test_reference_produces_pcygni(scenario):
     res = solve(scenario, RunConfig(n_bins=41))
     assert isinstance(res, WindLineResult)
@@ -45,6 +50,7 @@ def test_reference_produces_pcygni(scenario):
     assert jnp.max(res.flux[v > 0]) > 1.1  # redshifted emission
 
 
+@pytest.mark.slow
 def test_velocity_axis_is_x_times_vinf(scenario):
     res = solve(scenario, RunConfig(x_min=-1.0, x_max=1.0, n_bins=5))
     # v_inf = 2e8 cm/s = 2000 km/s.
@@ -52,6 +58,7 @@ def test_velocity_axis_is_x_times_vinf(scenario):
     assert jnp.allclose(res.velocity.ustrip(KMS), expected)
 
 
+@pytest.mark.slow
 def test_cgs_si_roundtrip(scenario):
     si = WindLineScenario(
         r_star=q(7.0e8, "m"),
@@ -70,11 +77,13 @@ def test_cgs_si_roundtrip(scenario):
     assert jnp.allclose(cgs.velocity.ustrip(KMS), other.velocity.ustrip(KMS))
 
 
+@pytest.mark.slow
 def test_default_config(scenario):
     res = solve(scenario)
     assert res.flux.shape == (RunConfig().n_bins,)
 
 
+@pytest.mark.slow
 def test_mc_dispatch_runs_and_is_pcygni(scenario):
     res = solve(scenario, RunConfig(n_bins=21, n_packets=100_000), Method.MC)
     assert res.method is Method.MC
@@ -126,8 +135,52 @@ def test_from_physical_sets_unit_mdot_scale_and_positive_tau():
     assert float(sc.density_ref.ustrip(u.unit("cm**-3"))) > 0.0
 
 
+@pytest.mark.slow
 def test_from_physical_produces_saturated_pcygni():
     res = solve(_ostar(), RunConfig(n_bins=41))
     v = res.velocity.ustrip(KMS)
     assert jnp.min(res.flux[v < 0]) < 0.5  # optically thick -> deep trough
     assert jnp.max(res.flux[v > 0]) > 1.1
+
+
+@pytest.mark.slow
+def test_self_consistent_source_via_config(scenario):
+    cfg = RunConfig(n_bins=41, source=SourceModel.SELF_CONSISTENT)
+    res = solve(scenario, cfg)
+    dx = 2.6 / 40
+    # Self-consistent source is photon-conserving (bounded equivalent width).
+    assert float(jnp.abs(jnp.sum(1.0 - res.flux) * dx)) < 0.3
+    v = res.velocity.ustrip(KMS)
+    assert jnp.min(res.flux[v < 0]) < 0.9
+    assert jnp.max(res.flux[v > 0]) > 1.1
+
+
+def test_collisional_parameters_resonance_line_is_scattering_dominated():
+    collision, w_core, boltzmann = collisional_parameters(
+        n_e=1.0e10, t_gas=3.0e4, t_rad=4.0e4, nu_0=1.936e15, collision_strength=1.0, a_ul=2.6e8
+    )
+    assert collision < 1.0e-3  # strong resonance line, modest density -> scattering
+    assert w_core > 0.0  # Planck occupation number
+    assert 0.0 < boltzmann < 1.0  # Boltzmann factor
+
+
+def test_collisional_parameters_scale_linearly_with_density():
+    kw = {"t_gas": 3.0e4, "t_rad": 4.0e4, "nu_0": 1.936e15, "collision_strength": 1.0, "a_ul": 2.6e8}
+    c1, _, _ = collisional_parameters(n_e=1.0e10, **kw)
+    c2, _, _ = collisional_parameters(n_e=2.0e10, **kw)
+    assert c2 == pytest.approx(2.0 * c1)
+
+
+@pytest.mark.slow
+def test_scenario_nlte_path(scenario):
+    # No collisions -> the scenario NLTE source equals the pure-scattering source;
+    # adding collisions thermalises the inner wind into extra emission.
+    cfg_nlte = RunConfig(n_bins=41, source=SourceModel.NLTE)
+    scattering = solve(scenario, RunConfig(n_bins=41, source=SourceModel.SELF_CONSISTENT)).flux
+    assert jnp.allclose(solve(scenario, cfg_nlte).flux, scattering, atol=1e-9)
+
+    collisional = replace(scenario, collision=3.0, w_core=0.6, boltzmann=0.5)
+    dx = 2.6 / 40
+    ew_scattering = float(jnp.sum(1.0 - scattering) * dx)
+    ew_collisional = float(jnp.sum(1.0 - solve(collisional, cfg_nlte).flux) * dx)
+    assert ew_collisional < ew_scattering  # collisions add thermal emission
